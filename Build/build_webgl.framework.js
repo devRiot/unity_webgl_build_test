@@ -2086,13 +2086,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5452080: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5452141: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5452205: function() {return Module.webglContextAttributes.powerPreference;},  
- 5452263: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5452318: function($0) {performance.now = function() { return $0; };},  
- 5452366: function($0) {performance.now = function() { return $0; };},  
- 5452414: function() {performance.now = Module['emscripten_get_now_backup'];}
+  5451664: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5451725: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5451789: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5451847: function() {Module['emscripten_get_now_backup'] = performance.now;},  
+ 5451902: function($0) {performance.now = function() { return $0; };},  
+ 5451950: function($0) {performance.now = function() { return $0; };},  
+ 5451998: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -4471,65 +4471,6 @@ var ASM_CONSTS = {
   {
   	var channel = WEBAudio.audioInstances[channelInstance];
   	channel.set3D(spatialBlendLevel);
-  }
-
-  function _JS_Sound_SetListenerOrientation(x, y, z, xUp, yUp, zUp)
-  {
-  	if (WEBAudio.audioWebEnabled == 0)
-  		return;
-  
-  	// Web Audio uses a RHS coordinate system, Unity uses LHS, causing orientations to be flipped.
-  	// So we pass a negative direction here to compensate, otherwise channels will be flipped.
-  	x = -x;
-  	y = -y;
-  	z = -z;
-  
-  	var l = WEBAudio.audioContext.listener;
-  
-  	// Do not re-set same values here if the orientation has not changed. This avoid unpredictable performance issues in Chrome
-  	// and Safari Web Audio implementations.
-  	if (l.forwardX) {
-  		// Use new properties if they exist ...
-  		if (l.forwardX.value !== x) l.forwardX.value = x;
-  		if (l.forwardY.value !== y) l.forwardY.value = y;
-  		if (l.forwardZ.value !== z) l.forwardZ.value = z;
-  
-  		if (l.upX.value !== xUp) l.upX.value = xUp;
-  		if (l.upY.value !== yUp) l.upY.value = yUp;
-  		if (l.upZ.value !== zUp) l.upZ.value = zUp;
-  	} else if (l._forwardX !== x || l._forwardY !== y || l._forwardZ !== z || l._upX !== xUp || l._upY !== yUp || l._upZ !== zUp) {
-  		// ... and old deprecated setOrientation if new properties are not supported.
-  		l.setOrientation(x, y, z, xUp, yUp, zUp);
-  		l._forwardX = x;
-  		l._forwardY = y;
-  		l._forwardZ = z;
-  		l._upX = xUp;
-  		l._upY = yUp;
-  		l._upZ = zUp;
-  	}
-  }
-
-  function _JS_Sound_SetListenerPosition(x, y, z)
-  {
-  	if (WEBAudio.audioWebEnabled == 0)
-  		return;
-  
-  	var l = WEBAudio.audioContext.listener;
-  
-  	// Do not re-set same values here if the orientation has not changed. This avoid unpredictable performance issues in Chrome
-  	// and Safari Web Audio implementations.
-  	if (l.positionX) {
-  		// Use new properties if they exist ...
-  		if (l.positionX.value !== x) l.positionX.value = x;
-  		if (l.positionY.value !== y) l.positionY.value = y;
-  		if (l.positionZ.value !== z) l.positionZ.value = z;
-  	} else if (l._positionX !== x || l._positionY !== y || l._positionZ !== z) {
-  		// ... and old deprecated setPosition if new properties are not supported.
-  		l.setPosition(x, y, z);
-  		l._positionX = x;
-  		l._positionY = y;
-  		l._positionZ = z;
-  	}
   }
 
   function _JS_Sound_SetLoop(channelInstance, loop)
@@ -17291,8 +17232,6 @@ var asmLibraryArg = {
   "JS_Sound_ReleaseInstance": _JS_Sound_ReleaseInstance,
   "JS_Sound_ResumeIfNeeded": _JS_Sound_ResumeIfNeeded,
   "JS_Sound_Set3D": _JS_Sound_Set3D,
-  "JS_Sound_SetListenerOrientation": _JS_Sound_SetListenerOrientation,
-  "JS_Sound_SetListenerPosition": _JS_Sound_SetListenerPosition,
   "JS_Sound_SetLoop": _JS_Sound_SetLoop,
   "JS_Sound_SetLoopPoints": _JS_Sound_SetLoopPoints,
   "JS_Sound_SetPaused": _JS_Sound_SetPaused,
