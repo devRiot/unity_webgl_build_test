@@ -2086,13 +2086,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5451360: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5451421: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5451485: function() {return Module.webglContextAttributes.powerPreference;},  
- 5451543: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5451598: function($0) {performance.now = function() { return $0; };},  
- 5451646: function($0) {performance.now = function() { return $0; };},  
- 5451694: function() {performance.now = Module['emscripten_get_now_backup'];}
+  5452080: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5452141: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5452205: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5452263: function() {Module['emscripten_get_now_backup'] = performance.now;},  
+ 5452318: function($0) {performance.now = function() { return $0; };},  
+ 5452366: function($0) {performance.now = function() { return $0; };},  
+ 5452414: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -2240,6 +2240,52 @@ var ASM_CONSTS = {
       return demangleAll(js);
     }
 
+  function _CheckMicrophonePermission() {
+          // 브라우저가 Permissions API를 지원하는 경우
+          if (navigator.permissions && navigator.permissions.query) {
+              // 비동기적으로 확인하지만 동기 반환을 위해 저장된 상태 사용
+              navigator.permissions.query({name: 'microphone'}).then(function(result) {
+                  // 권한 상태를 전역 변수에 저장
+                  window.microphonePermissionState = result.state;
+              });
+              
+              // 저장된 상태가 있으면 반환, 없으면 false
+              return window.microphonePermissionState === 'granted';
+          }
+          
+          // Permissions API를 지원하지 않는 경우, 이전 접근 시도 결과 반환
+          return window.lastMicrophoneAccessSuccess || false;
+      }
+
+  function _GetAvailableMicrophones(gameObjectName, callbackMethod) {
+          var gameObject = UTF8ToString(gameObjectName);
+          var callback = UTF8ToString(callbackMethod);
+          
+          if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+              SendMessage(gameObject, callback, JSON.stringify([]));
+              return;
+          }
+  
+          navigator.mediaDevices.enumerateDevices()
+          .then(function(devices) {
+              var microphones = [];
+              
+              devices.forEach(function(device) {
+                  if (device.kind === 'audioinput') {
+                      // 마이크 이름이 없는 경우 기본 이름 사용
+                      var label = device.label || ('마이크 ' + (microphones.length + 1));
+                      microphones.push(label);
+                  }
+              });
+              
+              SendMessage(gameObject, callback, JSON.stringify(microphones));
+          })
+          .catch(function(error) {
+              console.error('마이크 목록 가져오기 실패:', error);
+              SendMessage(gameObject, callback, JSON.stringify([]));
+          });
+      }
+
   function _GetJSMemoryInfo(totalJSptr, usedJSptr) {
       if (performance.memory) {
         HEAPF64[totalJSptr >> 3] = performance.memory.totalJSHeapSize;
@@ -2249,6 +2295,10 @@ var ASM_CONSTS = {
         HEAPF64[usedJSptr >> 3] = NaN;
       }
     }
+
+  function _IsMicrophoneSupported() {
+          return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      }
 
   var JS_Accelerometer = null;
   
@@ -5503,6 +5553,97 @@ var ASM_CONSTS = {
   
           requestOptions.timeout = timeout;
   	}
+
+  function _RequestMicrophonePermission(gameObjectName, callbackMethod) {
+          var gameObject = UTF8ToString(gameObjectName);
+          var callback = UTF8ToString(callbackMethod);
+          
+          // 브라우저가 getUserMedia를 지원하는지 확인
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+              var response = {
+                  success: false,
+                  message: "브라우저가 마이크 접근을 지원하지 않습니다.",
+                  error: "MediaDevices API not supported"
+              };
+              
+              SendMessage(gameObject, callback, JSON.stringify(response));
+              return;
+          }
+  
+          // HTTPS 연결 확인 (로컬호스트 제외)
+          if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+              var response = {
+                  success: false,
+                  message: "마이크 접근은 HTTPS 연결에서만 가능합니다.",
+                  error: "HTTPS required"
+              };
+              
+              SendMessage(gameObject, callback, JSON.stringify(response));
+              return;
+          }
+  
+          // 마이크 권한 요청
+          navigator.mediaDevices.getUserMedia({ 
+              audio: {
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true
+              }
+          })
+          .then(function(stream) {
+              // 권한이 허용되면 스트림을 즉시 정지
+              stream.getTracks().forEach(function(track) {
+                  track.stop();
+              });
+              
+              var response = {
+                  success: true,
+                  message: "마이크 권한이 허용되었습니다.",
+                  error: ""
+              };
+              
+              SendMessage(gameObject, callback, JSON.stringify(response));
+          })
+          .catch(function(error) {
+              var errorMessage = "";
+              var errorType = "";
+              
+              switch(error.name) {
+                  case 'NotAllowedError':
+                      errorMessage = "사용자가 마이크 접근을 거부했습니다.";
+                      errorType = "Permission denied";
+                      break;
+                  case 'NotFoundError':
+                      errorMessage = "마이크를 찾을 수 없습니다.";
+                      errorType = "No microphone found";
+                      break;
+                  case 'NotSupportedError':
+                      errorMessage = "브라우저가 마이크 접근을 지원하지 않습니다.";
+                      errorType = "Not supported";
+                      break;
+                  case 'OverconstrainedError':
+                      errorMessage = "마이크 설정 제약 조건을 만족할 수 없습니다.";
+                      errorType = "Constraints not satisfied";
+                      break;
+                  case 'SecurityError':
+                      errorMessage = "보안 오류로 인해 마이크에 접근할 수 없습니다.";
+                      errorType = "Security error";
+                      break;
+                  default:
+                      errorMessage = "알 수 없는 오류가 발생했습니다: " + error.message;
+                      errorType = "Unknown error";
+                      break;
+              }
+              
+              var response = {
+                  success: false,
+                  message: errorMessage,
+                  error: errorType
+              };
+              
+              SendMessage(gameObject, callback, JSON.stringify(response));
+          });
+      }
 
   var _best_http_request_bridge_global = {requestInstances:{},nextRequestId:1,loglevel:2,SendTextToCSharpSide:function(request, onbuffer, text)
           {
@@ -17090,7 +17231,10 @@ function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
 }
 var asmLibraryArg = {
+  "CheckMicrophonePermission": _CheckMicrophonePermission,
+  "GetAvailableMicrophones": _GetAvailableMicrophones,
   "GetJSMemoryInfo": _GetJSMemoryInfo,
+  "IsMicrophoneSupported": _IsMicrophoneSupported,
   "JS_Accelerometer_IsRunning": _JS_Accelerometer_IsRunning,
   "JS_Accelerometer_Start": _JS_Accelerometer_Start,
   "JS_Accelerometer_Stop": _JS_Accelerometer_Stop,
@@ -17209,6 +17353,7 @@ var asmLibraryArg = {
   "JS_WebRequest_SetRedirectLimit": _JS_WebRequest_SetRedirectLimit,
   "JS_WebRequest_SetRequestHeader": _JS_WebRequest_SetRequestHeader,
   "JS_WebRequest_SetTimeout": _JS_WebRequest_SetTimeout,
+  "RequestMicrophonePermission": _RequestMicrophonePermission,
   "XHR_Abort": _XHR_Abort,
   "XHR_Create": _XHR_Create,
   "XHR_Release": _XHR_Release,
@@ -17983,10 +18128,10 @@ var dynCall_iijiii = Module["dynCall_iijiii"] = createExportWrapper("dynCall_iij
 var dynCall_vijii = Module["dynCall_vijii"] = createExportWrapper("dynCall_vijii");
 
 /** @type {function(...*):?} */
-var dynCall_fi = Module["dynCall_fi"] = createExportWrapper("dynCall_fi");
+var dynCall_iiiiiifi = Module["dynCall_iiiiiifi"] = createExportWrapper("dynCall_iiiiiifi");
 
 /** @type {function(...*):?} */
-var dynCall_iiiiiifi = Module["dynCall_iiiiiifi"] = createExportWrapper("dynCall_iiiiiifi");
+var dynCall_fi = Module["dynCall_fi"] = createExportWrapper("dynCall_fi");
 
 /** @type {function(...*):?} */
 var dynCall_jijjjji = Module["dynCall_jijjjji"] = createExportWrapper("dynCall_jijjjji");
@@ -19903,10 +20048,10 @@ function invoke_viffi(index,a1,a2,a3,a4) {
   }
 }
 
-function invoke_fi(index,a1) {
+function invoke_iiiiiifi(index,a1,a2,a3,a4,a5,a6,a7) {
   var sp = stackSave();
   try {
-    return dynCall_fi(index,a1);
+    return dynCall_iiiiiifi(index,a1,a2,a3,a4,a5,a6,a7);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -19914,10 +20059,10 @@ function invoke_fi(index,a1) {
   }
 }
 
-function invoke_iiiiiifi(index,a1,a2,a3,a4,a5,a6,a7) {
+function invoke_fi(index,a1) {
   var sp = stackSave();
   try {
-    return dynCall_iiiiiifi(index,a1,a2,a3,a4,a5,a6,a7);
+    return dynCall_fi(index,a1);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
