@@ -13,7 +13,7 @@
 </head>
   <body>
     <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=400 height=600 tabindex="-1"></canvas>
+      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
       <div id="unity-loading-bar">
         <div id="unity-logo"></div>
         <div id="unity-progress-bar-empty">
@@ -63,9 +63,9 @@
       var buildUrl = "Build";
       var loaderUrl = buildUrl + "/build_webgl.loader.js";
       var config = {
-        dataUrl: buildUrl + "/build_webgl.data",
-        frameworkUrl: buildUrl + "/build_webgl.framework.js",
-        codeUrl: buildUrl + "/build_webgl.wasm",
+        dataUrl: buildUrl + "/build_webgl.data.gz",
+        frameworkUrl: buildUrl + "/build_webgl.framework.js.gz",
+        codeUrl: buildUrl + "/build_webgl.wasm.gz",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "Beluga Corp.",
         productName: "브레인 오케이",
@@ -107,7 +107,7 @@
       } else {
         // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
 
-        canvas.style.width = "400px";
+        canvas.style.width = "960px";
         canvas.style.height = "600px";
       }
 
