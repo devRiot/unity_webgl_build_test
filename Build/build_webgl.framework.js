@@ -2094,13 +2094,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5576832: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5576893: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5576957: function() {return Module.webglContextAttributes.powerPreference;},  
- 5577015: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5577070: function($0) {performance.now = function() { return $0; };},  
- 5577118: function($0) {performance.now = function() { return $0; };},  
- 5577166: function() {performance.now = Module['emscripten_get_now_backup'];}
+  5579520: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5579581: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5579645: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5579703: function() {Module['emscripten_get_now_backup'] = performance.now;},  
+ 5579758: function($0) {performance.now = function() { return $0; };},  
+ 5579806: function($0) {performance.now = function() { return $0; };},  
+ 5579854: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -2265,6 +2265,51 @@ var ASM_CONSTS = {
           return window.lastMicrophoneAccessSuccess || false;
       }
 
+  function _DownloadBase64Audio(fileName, base64Data) {
+          const fileNameStr = UTF8ToString(fileName);
+          const base64Str = UTF8ToString(base64Data);
+  
+          // Base64를 Blob으로 변환
+          const byteCharacters = atob(base64Str);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], {type: 'audio/wav'});
+  
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          document.body.appendChild(a);
+          a.style = 'display: none';
+          a.href = url;
+          a.download = fileNameStr;
+          a.click();
+  
+          // 정리
+          URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+      }
+
+  function _DownloadRecordedAudio(fileName) {
+          if (!this._lastAudioBlob) {
+              console.error("다운로드할 오디오 데이터가 없습니다.");
+              return;
+          }
+  
+          const url = URL.createObjectURL(this._lastAudioBlob);
+          const a = document.createElement('a');
+          document.body.appendChild(a);
+          a.style = 'display: none';
+          a.href = url;
+          a.download = UTF8ToString(fileName);
+          a.click();
+          
+          // 정리
+          URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+      }
+
   function _GetAvailableMicrophones(gameObjectName, callbackMethod) {
           var gameObject = UTF8ToString(gameObjectName);
           var callback = UTF8ToString(callbackMethod);
@@ -2306,6 +2351,10 @@ var ASM_CONSTS = {
 
   function _IsMicrophoneSupported() {
           return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      }
+
+  function _IsWebGLMicrophoneRecording() {
+          return this._mediaRecorder && this._mediaRecorder.state === "recording";
       }
 
   var JS_Accelerometer = null;
@@ -5651,6 +5700,158 @@ var ASM_CONSTS = {
               
               SendMessage(gameObject, callback, JSON.stringify(response));
           });
+      }
+
+  function _StartWebGLMicrophone(gameObjectName, callbackMethodName, levelCallbackMethodName) {
+          // 콜백 정보를 저장
+          this._gameObjectName = UTF8ToString(gameObjectName);
+          this._callbackMethodName = UTF8ToString(callbackMethodName);
+  
+          // --- 기존 오디오 분석 중지 ---
+          if (this._animationFrameId) {
+              cancelAnimationFrame(this._animationFrameId);
+              this._animationFrameId = null;
+          }
+          if (this._audioContext) {
+              this._audioContext.close();
+              this._audioContext = null;
+          }
+  
+          // 녹음이 이미 진행 중인 경우 중지
+          if (this._mediaStream) {
+              this._mediaStream.getTracks().forEach(track => track.stop());
+              this._mediaStream = null;
+          }
+          if (this._mediaRecorder) {
+              this._mediaRecorder = null;
+          }
+          this._audioChunks = [];
+  
+          // 마이크 권한 요청 및 녹음 시작
+          navigator.mediaDevices.getUserMedia({ audio: true })
+              .then(function (stream) {
+                  this._mediaStream = stream;
+  
+                  // --- 음성 레벨 체크 시작 ---
+                  if (levelCallbackMethodName) {
+                      try {
+                          const levelCallbackMethodNameStr = UTF8ToString(levelCallbackMethodName);
+                          if (levelCallbackMethodNameStr) {
+                              this._levelGameObjectName = this._gameObjectName;
+                              this._levelCallbackMethodName = levelCallbackMethodNameStr;
+  
+                              this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                              this._source = this._audioContext.createMediaStreamSource(stream);
+                              this._analyser = this._audioContext.createAnalyser();
+                              this._analyser.fftSize = 256;
+                              const bufferLength = this._analyser.frequencyBinCount;
+                              this._dataArray = new Uint8Array(bufferLength);
+                              this._source.connect(this._analyser);
+                              
+                              // 레벨 체크 루프 시작
+                              this._audioLevelLoop();
+                          }
+                      } catch (e) {
+                          console.error("음성 레벨 체크 설정 오류:", e);
+                      }
+                  }
+  
+                  const options = { mimeType: 'audio/wav' };
+                  try {
+                      this._mediaRecorder = new MediaRecorder(stream, options);
+                  } catch (e) {
+                      console.warn("WAV 마임타입을 지원하지 않아 기본값으로 MediaRecorder를 생성합니다. 오류:", e);
+                      this._mediaRecorder = new MediaRecorder(stream);
+                  }
+  
+                  // 녹음 데이터가 사용 가능할 때 호출될 이벤트 핸들러
+                  this._mediaRecorder.ondataavailable = function (event) {
+                      if (event.data.size > 0) {
+                          this._audioChunks.push(event.data);
+                      }
+                  }.bind(this);
+  
+                  // 녹음이 중지될 때 호출될 이벤트 핸들러
+                  this._mediaRecorder.onstop = function () {
+                      // --- 오디오 분석 중지 ---
+                      if (this._animationFrameId) {
+                          cancelAnimationFrame(this._animationFrameId);
+                          this._animationFrameId = null;
+                      }
+                      if (this._audioContext) {
+                          this._audioContext.close();
+                          this._audioContext = null;
+                      }
+  
+                      if (this._audioChunks.length === 0) {
+                          console.log("녹음된 오디오 데이터가 없습니다.");
+                          SendMessage(this._gameObjectName, "OnRecognitionFailure", "녹음된 오디오 데이터가 없습니다.");
+                          return;
+                      }
+                      
+                      // Blob을 생성하고 저장
+                      const audioBlob = new Blob(this._audioChunks, { type: this._mediaRecorder.mimeType });
+                      this._lastAudioBlob = audioBlob;
+  
+                      // ArrayBuffer를 읽고, WAV 헤더를 제거한 후 Base64로 변환하여 전송
+                      const reader = new FileReader();
+                      reader.readAsArrayBuffer(audioBlob);
+                      
+                      reader.onloadend = function () {
+                          const wavHeaderSize = 44; // 표준 WAV 헤더 크기
+                          const arrayBuffer = reader.result;
+  
+                          if (arrayBuffer.byteLength <= wavHeaderSize) {
+                              console.error("오디오 데이터가 너무 짧아 WAV 헤더를 제거할 수 없습니다.");
+                              SendMessage(this._gameObjectName, "OnRecognitionFailure", "오디오 데이터가 너무 짧습니다.");
+                              return;
+                          }
+  
+                          // 헤더를 제외한 순수 PCM 데이터 추출
+                          const pcmData = arrayBuffer.slice(wavHeaderSize);
+                          
+                          // PCM 데이터를 Uint8Array로 변환 후 Base64로 인코딩
+                          const uint8Array = new Uint8Array(pcmData);
+                          let binary = '';
+                          for (let i = 0; i < uint8Array.byteLength; i++) {
+                              binary += String.fromCharCode(uint8Array[i]);
+                          }
+                          const base64String = window.btoa(binary);
+                          
+                          // C#의 콜백 함수로 Base64 인코딩된 PCM 데이터 전송
+                          SendMessage(this._gameObjectName, this._callbackMethodName, base64String);
+                      }.bind(this);
+  
+                      reader.onerror = function (error) {
+                          console.error("FileReader 오류:", error);
+                          SendMessage(this._gameObjectName, "OnRecognitionFailure", "파일 읽기 오류: " + error);
+                      }.bind(this);
+  
+                      // 스트림과 레코더, 청크 정리
+                      if (this._mediaStream) {
+                          this._mediaStream.getTracks().forEach(track => track.stop());
+                          this._mediaStream = null;
+                      }
+                      this._mediaRecorder = null;
+                      this._audioChunks = [];
+                  }.bind(this);
+  
+                  // 녹음 시작
+                  this._mediaRecorder.start();
+                  console.log("WebGL 마이크 녹음을 시작합니다.");
+              }.bind(this))
+              .catch(function (err) {
+                  console.error("마이크 접근 오류:", err);
+                  // Unity로 에러 메시지 전송 (선택 사항)
+                  SendMessage(this._gameObjectName, "OnRecognitionFailure", "마이크 접근에 실패했습니다: " + err.message);
+              }.bind(this));
+      }
+
+  function _StopWebGLMicrophone() {
+          if (this._mediaRecorder && this._mediaRecorder.state === "recording") {
+              this._mediaRecorder.stop();
+              console.log("WebGL 마이크 녹음을 중지합니다.");
+          }
       }
 
   var _best_http_request_bridge_global = {requestInstances:{},nextRequestId:1,loglevel:2,SendTextToCSharpSide:function(request, onbuffer, text)
@@ -16926,9 +17127,12 @@ function checkIncomingModuleAPI() {
 }
 var asmLibraryArg = {
   "CheckMicrophonePermission": _CheckMicrophonePermission,
+  "DownloadBase64Audio": _DownloadBase64Audio,
+  "DownloadRecordedAudio": _DownloadRecordedAudio,
   "GetAvailableMicrophones": _GetAvailableMicrophones,
   "GetJSMemoryInfo": _GetJSMemoryInfo,
   "IsMicrophoneSupported": _IsMicrophoneSupported,
+  "IsWebGLMicrophoneRecording": _IsWebGLMicrophoneRecording,
   "JS_Accelerometer_IsRunning": _JS_Accelerometer_IsRunning,
   "JS_Accelerometer_Start": _JS_Accelerometer_Start,
   "JS_Accelerometer_Stop": _JS_Accelerometer_Stop,
@@ -17048,6 +17252,8 @@ var asmLibraryArg = {
   "JS_WebRequest_SetRequestHeader": _JS_WebRequest_SetRequestHeader,
   "JS_WebRequest_SetTimeout": _JS_WebRequest_SetTimeout,
   "RequestMicrophonePermission": _RequestMicrophonePermission,
+  "StartWebGLMicrophone": _StartWebGLMicrophone,
+  "StopWebGLMicrophone": _StopWebGLMicrophone,
   "XHR_Abort": _XHR_Abort,
   "XHR_Create": _XHR_Create,
   "XHR_Release": _XHR_Release,
@@ -17371,6 +17577,7 @@ var asmLibraryArg = {
   "invoke_iiifii": invoke_iiifii,
   "invoke_iiii": invoke_iiii,
   "invoke_iiiidii": invoke_iiiidii,
+  "invoke_iiiifi": invoke_iiiifi,
   "invoke_iiiifii": invoke_iiiifii,
   "invoke_iiiii": invoke_iiiii,
   "invoke_iiiiiffi": invoke_iiiiiffi,
@@ -17733,15 +17940,6 @@ var dynCall_viiiiiiiiiii = Module["dynCall_viiiiiiiiiii"] = createExportWrapper(
 var dynCall_vifi = Module["dynCall_vifi"] = createExportWrapper("dynCall_vifi");
 
 /** @type {function(...*):?} */
-var dynCall_viijjii = Module["dynCall_viijjii"] = createExportWrapper("dynCall_viijjii");
-
-/** @type {function(...*):?} */
-var dynCall_dii = Module["dynCall_dii"] = createExportWrapper("dynCall_dii");
-
-/** @type {function(...*):?} */
-var dynCall_jiiii = Module["dynCall_jiiii"] = createExportWrapper("dynCall_jiiii");
-
-/** @type {function(...*):?} */
 var dynCall_iiifii = Module["dynCall_iiifii"] = createExportWrapper("dynCall_iiifii");
 
 /** @type {function(...*):?} */
@@ -17751,37 +17949,49 @@ var dynCall_viiiifii = Module["dynCall_viiiifii"] = createExportWrapper("dynCall
 var dynCall_viiffi = Module["dynCall_viiffi"] = createExportWrapper("dynCall_viiffi");
 
 /** @type {function(...*):?} */
+var dynCall_jidi = Module["dynCall_jidi"] = createExportWrapper("dynCall_jidi");
+
+/** @type {function(...*):?} */
+var dynCall_ijji = Module["dynCall_ijji"] = createExportWrapper("dynCall_ijji");
+
+/** @type {function(...*):?} */
+var dynCall_viijiiii = Module["dynCall_viijiiii"] = createExportWrapper("dynCall_viijiiii");
+
+/** @type {function(...*):?} */
+var dynCall_dii = Module["dynCall_dii"] = createExportWrapper("dynCall_dii");
+
+/** @type {function(...*):?} */
+var dynCall_jji = Module["dynCall_jji"] = createExportWrapper("dynCall_jji");
+
+/** @type {function(...*):?} */
+var dynCall_viijii = Module["dynCall_viijii"] = createExportWrapper("dynCall_viijii");
+
+/** @type {function(...*):?} */
+var dynCall_jijjjji = Module["dynCall_jijjjji"] = createExportWrapper("dynCall_jijjjji");
+
+/** @type {function(...*):?} */
+var dynCall_viijjii = Module["dynCall_viijjii"] = createExportWrapper("dynCall_viijjii");
+
+/** @type {function(...*):?} */
+var dynCall_jiiii = Module["dynCall_jiiii"] = createExportWrapper("dynCall_jiiii");
+
+/** @type {function(...*):?} */
 var dynCall_iiiiiifi = Module["dynCall_iiiiiifi"] = createExportWrapper("dynCall_iiiiiifi");
 
 /** @type {function(...*):?} */
 var dynCall_fi = Module["dynCall_fi"] = createExportWrapper("dynCall_fi");
 
 /** @type {function(...*):?} */
-var dynCall_jiii = Module["dynCall_jiii"] = createExportWrapper("dynCall_jiii");
-
-/** @type {function(...*):?} */
-var dynCall_jijjjji = Module["dynCall_jijjjji"] = createExportWrapper("dynCall_jijjjji");
-
-/** @type {function(...*):?} */
-var dynCall_jidi = Module["dynCall_jidi"] = createExportWrapper("dynCall_jidi");
-
-/** @type {function(...*):?} */
-var dynCall_viijiiii = Module["dynCall_viijiiii"] = createExportWrapper("dynCall_viijiiii");
-
-/** @type {function(...*):?} */
-var dynCall_ijji = Module["dynCall_ijji"] = createExportWrapper("dynCall_ijji");
-
-/** @type {function(...*):?} */
-var dynCall_jji = Module["dynCall_jji"] = createExportWrapper("dynCall_jji");
-
-/** @type {function(...*):?} */
 var dynCall_jdi = Module["dynCall_jdi"] = createExportWrapper("dynCall_jdi");
 
 /** @type {function(...*):?} */
-var dynCall_viijii = Module["dynCall_viijii"] = createExportWrapper("dynCall_viijii");
+var dynCall_jiii = Module["dynCall_jiii"] = createExportWrapper("dynCall_jiii");
 
 /** @type {function(...*):?} */
 var dynCall_iiifi = Module["dynCall_iiifi"] = createExportWrapper("dynCall_iiifi");
+
+/** @type {function(...*):?} */
+var dynCall_iiiifi = Module["dynCall_iiiifi"] = createExportWrapper("dynCall_iiiifi");
 
 /** @type {function(...*):?} */
 var dynCall_viiiifi = Module["dynCall_viiiifi"] = createExportWrapper("dynCall_viiiifi");
@@ -17854,9 +18064,6 @@ var dynCall_viiifffii = Module["dynCall_viiifffii"] = createExportWrapper("dynCa
 
 /** @type {function(...*):?} */
 var dynCall_iiiiiiiiii = Module["dynCall_iiiiiiiiii"] = createExportWrapper("dynCall_iiiiiiiiii");
-
-/** @type {function(...*):?} */
-var dynCall_iiiifi = Module["dynCall_iiiifi"] = createExportWrapper("dynCall_iiiifi");
 
 /** @type {function(...*):?} */
 var dynCall_iiiiiiiiiji = Module["dynCall_iiiiiiiiiji"] = createExportWrapper("dynCall_iiiiiiiiiji");
@@ -19383,28 +19590,6 @@ function invoke_viifi(index,a1,a2,a3,a4) {
   }
 }
 
-function invoke_iiid(index,a1,a2,a3) {
-  var sp = stackSave();
-  try {
-    return dynCall_iiid(index,a1,a2,a3);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_viiiiiii(index,a1,a2,a3,a4,a5,a6,a7) {
-  var sp = stackSave();
-  try {
-    dynCall_viiiiiii(index,a1,a2,a3,a4,a5,a6,a7);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
 function invoke_iiifii(index,a1,a2,a3,a4,a5) {
   var sp = stackSave();
   try {
@@ -19438,10 +19623,21 @@ function invoke_viiffi(index,a1,a2,a3,a4,a5) {
   }
 }
 
-function invoke_viiiifi(index,a1,a2,a3,a4,a5,a6) {
+function invoke_iiid(index,a1,a2,a3) {
   var sp = stackSave();
   try {
-    dynCall_viiiifi(index,a1,a2,a3,a4,a5,a6);
+    return dynCall_iiid(index,a1,a2,a3);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viiiiiii(index,a1,a2,a3,a4,a5,a6,a7) {
+  var sp = stackSave();
+  try {
+    dynCall_viiiiiii(index,a1,a2,a3,a4,a5,a6,a7);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -19471,10 +19667,10 @@ function invoke_fi(index,a1) {
   }
 }
 
-function invoke_viiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9) {
+function invoke_iiifi(index,a1,a2,a3,a4) {
   var sp = stackSave();
   try {
-    dynCall_viiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9);
+    return dynCall_iiifi(index,a1,a2,a3,a4);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -19482,10 +19678,21 @@ function invoke_viiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9) {
   }
 }
 
-function invoke_iiifi(index,a1,a2,a3,a4) {
+function invoke_iiiifi(index,a1,a2,a3,a4,a5) {
   var sp = stackSave();
   try {
-    return dynCall_iiifi(index,a1,a2,a3,a4);
+    return dynCall_iiiifi(index,a1,a2,a3,a4,a5);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viiiifi(index,a1,a2,a3,a4,a5,a6) {
+  var sp = stackSave();
+  try {
+    dynCall_viiiifi(index,a1,a2,a3,a4,a5,a6);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -19508,6 +19715,17 @@ function invoke_idi(index,a1,a2) {
   var sp = stackSave();
   try {
     return dynCall_idi(index,a1,a2);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9) {
+  var sp = stackSave();
+  try {
+    dynCall_viiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -20032,10 +20250,10 @@ function invoke_ijiii(index,a1,a2,a3,a4,a5) {
   }
 }
 
-function invoke_iiij(index,a1,a2,a3,a4) {
+function invoke_jji(index,a1,a2,a3) {
   var sp = stackSave();
   try {
-    return dynCall_iiij(index,a1,a2,a3,a4);
+    return dynCall_jji(index,a1,a2,a3);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -20043,10 +20261,10 @@ function invoke_iiij(index,a1,a2,a3,a4) {
   }
 }
 
-function invoke_jiiii(index,a1,a2,a3,a4) {
+function invoke_viijii(index,a1,a2,a3,a4,a5,a6) {
   var sp = stackSave();
   try {
-    return dynCall_jiiii(index,a1,a2,a3,a4);
+    dynCall_viijii(index,a1,a2,a3,a4,a5,a6);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -20098,17 +20316,6 @@ function invoke_ijji(index,a1,a2,a3,a4,a5) {
   }
 }
 
-function invoke_jji(index,a1,a2,a3) {
-  var sp = stackSave();
-  try {
-    return dynCall_jji(index,a1,a2,a3);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
 function invoke_jdi(index,a1,a2) {
   var sp = stackSave();
   try {
@@ -20120,10 +20327,21 @@ function invoke_jdi(index,a1,a2) {
   }
 }
 
-function invoke_viijii(index,a1,a2,a3,a4,a5,a6) {
+function invoke_iiij(index,a1,a2,a3,a4) {
   var sp = stackSave();
   try {
-    dynCall_viijii(index,a1,a2,a3,a4,a5,a6);
+    return dynCall_iiij(index,a1,a2,a3,a4);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_jiiii(index,a1,a2,a3,a4) {
+  var sp = stackSave();
+  try {
+    return dynCall_jiiii(index,a1,a2,a3,a4);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
