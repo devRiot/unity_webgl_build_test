@@ -5642,9 +5642,9 @@ var ASM_CONSTS = {
           // 마이크 권한 요청
           navigator.mediaDevices.getUserMedia({ 
               audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false
               }
           })
           .then(function(stream) {
