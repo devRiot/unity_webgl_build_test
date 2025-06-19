@@ -17,7 +17,7 @@ class Microphone {
         this.deviceKinds = {
             VideoInput: "videoinput",
             AudioInput: "audioinput",
-            AudioOutput: "audioinput"
+            AudioOutput: "audiooutput"
         };
         this.initialize(this);
         this.check();
@@ -93,6 +93,7 @@ class Microphone {
         this.mediaStreamSource.disconnect(this.audioWorkletNode);
         // setInterval 타이머 중지
         if (this._checkIntervalId !== null) {
+            Microphone.log("clearInterval with ID: " + this._checkIntervalId); // 로그 추가
             clearInterval(this._checkIntervalId);
             this._checkIntervalId = null;
         }
