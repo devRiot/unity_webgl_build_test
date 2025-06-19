@@ -2094,13 +2094,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5579616: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5579677: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5579741: function() {return Module.webglContextAttributes.powerPreference;},  
- 5579799: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5579854: function($0) {performance.now = function() { return $0; };},  
- 5579902: function($0) {performance.now = function() { return $0; };},  
- 5579950: function() {performance.now = Module['emscripten_get_now_backup'];}
+  5579040: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5579101: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5579165: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5579223: function() {Module['emscripten_get_now_backup'] = performance.now;},  
+ 5579278: function($0) {performance.now = function() { return $0; };},  
+ 5579326: function($0) {performance.now = function() { return $0; };},  
+ 5579374: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -5585,16 +5585,6 @@ var ASM_CONSTS = {
           requestOptions.timeout = timeout;
   	}
 
-  function _JsSetTimeout(message, timeout, callback) {
-          // Create copy of message because it might be deleted before callback is run
-          var stringMessage = UTF8ToString(message);
-          var buffer = stringToNewUTF8(stringMessage);
-          setTimeout(function () {
-              (function(a1, a2) {  dynCall_vii.apply(null, [callback, a1, a2]); }) (true, buffer);
-              _free(buffer);
-          }, timeout);
-      }
-
   function _RequestMicrophonePermission(gameObjectName, callbackMethod) {
           var gameObject = UTF8ToString(gameObjectName);
           var callback = UTF8ToString(callbackMethod);
@@ -5684,86 +5674,6 @@ var ASM_CONSTS = {
               
               SendMessage(gameObject, callback, JSON.stringify(response));
           });
-      }
-
-  function _ResumeAudioContext() {
-      if (typeof AudioContext !== 'undefined' && AudioContext.current && AudioContext.current.state === 'suspended') {
-        AudioContext.current.resume();
-      } else if (typeof webkitAudioContext !== 'undefined' && webkitAudioContext.current && webkitAudioContext.current.state === 'suspended') {
-        webkitAudioContext.current.resume();
-      }
-    }
-
-  function _WebGLSpeechDetectionPluginInit(callback) {
-          console.log("WebGLSpeechDetectionPlugin: Init");
-          window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          if (SpeechRecognition == undefined) {
-              console.log("SpeechRecognition is not defined")
-              return;
-          }
-          if (document.WebGLSpeechDetectionPluginRecognition != undefined) {
-              return;
-          }
-          document.WebGLSpeechDetectionPluginRecognitionState = false;
-          document.WebGLSpeechDetectionPluginRecognition = new SpeechRecognition();
-          document.WebGLSpeechDetectionPluginRecognition.interimResults = true;
-          document.WebGLSpeechDetectionPluginRecognition.continuous = true;
-          document.WebGLSpeechDetectionPluginDetect = function (event) {
-              //const results = Array.from(event.results);
-              // console.log("results=");
-              // console.log(event.results);
-  
-              // delve into words detected results & get the latest
-              // total results detected
-              var resultsLength = event.results.length -1 ;
-              // get length of latest results
-              var ArrayLength = event.results[resultsLength].length -1;
-              // final
-              console.log(event.results[resultsLength]);
-              var isFinal = event.results[resultsLength].isFinal;
-              // get last word detected
-              var saidWord = event.results[resultsLength][ArrayLength].transcript;
-              console.log("saidWord=" + saidWord);
-              
-              // if(isFinal){
-                  // var stringMessage = UTF8ToString(saidWord);
-                  // var buffer = stringToNewUTF8(stringMessage);
-                  // (function(a1) {  dynCall_vi.apply(null, [callback, a1]); }) (buffer);
-  
-                  var bufferSize = lengthBytesUTF8(saidWord) + 1;
-                  var buffer = _malloc(bufferSize);
-                  stringToUTF8(saidWord, buffer, bufferSize);
-                  console.log("buffer=" + buffer);
-                  (function(a1, a2) {  dynCall_vii.apply(null, [callback, a1, a2]); }) (isFinal, buffer);
-              //}
-          };
-          document.WebGLSpeechDetectionPluginEnd = function (event) {
-              console.log("End=");
-              console.log(event); // 잘 출력됨
-              if(document.WebGLSpeechDetectionPluginRecognitionState) {
-                  document.WebGLSpeechDetectionPluginRecognition.start();
-              }
-          };
-          document.WebGLSpeechDetectionPluginRecognition.addEventListener('end', document.WebGLSpeechDetectionPluginEnd);
-          // document.WebGLSpeechDetectionPluginRecognition.addEventListener('end', document.WebGLSpeechDetectionPluginRecognition.start);
-          document.WebGLSpeechDetectionPluginRecognition.addEventListener('result', document.WebGLSpeechDetectionPluginDetect);
-          // recognition.onresult = function(event){};
-          // document.WebGLSpeechDetectionPluginRecognition.stop();
-          document.WebGLSpeechDetectionPluginRecognition.start();
-      }
-
-  function _WebGLSpeechDetectionPluginIsAvailable() {
-          return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-      }
-
-  function _WebGLSpeechDetectionPluginStart() {
-          document.WebGLSpeechDetectionPluginRecognitionState = true;
-          document.WebGLSpeechDetectionPluginRecognition.start();
-      }
-
-  function _WebGLSpeechDetectionPluginStop() {
-          document.WebGLSpeechDetectionPluginRecognitionState = false;
-          document.WebGLSpeechDetectionPluginRecognition.stop();
       }
 
   var _best_http_request_bridge_global = {requestInstances:{},nextRequestId:1,loglevel:2,SendTextToCSharpSide:function(request, onbuffer, text)
@@ -16470,12 +16380,6 @@ var ASM_CONSTS = {
 
   function _llvm_eh_typeid_for() { abort(); }
 
-  function _reloadPage(callback){
-          // window.location.reload();
-          console.log("reloadPage");
-          
-      }
-
   function _setLeapSync(enabled) {
           if(document.microphoneNative === undefined)
               return;
@@ -17167,13 +17071,7 @@ var asmLibraryArg = {
   "JS_WebRequest_SetRedirectLimit": _JS_WebRequest_SetRedirectLimit,
   "JS_WebRequest_SetRequestHeader": _JS_WebRequest_SetRequestHeader,
   "JS_WebRequest_SetTimeout": _JS_WebRequest_SetTimeout,
-  "JsSetTimeout": _JsSetTimeout,
   "RequestMicrophonePermission": _RequestMicrophonePermission,
-  "ResumeAudioContext": _ResumeAudioContext,
-  "WebGLSpeechDetectionPluginInit": _WebGLSpeechDetectionPluginInit,
-  "WebGLSpeechDetectionPluginIsAvailable": _WebGLSpeechDetectionPluginIsAvailable,
-  "WebGLSpeechDetectionPluginStart": _WebGLSpeechDetectionPluginStart,
-  "WebGLSpeechDetectionPluginStop": _WebGLSpeechDetectionPluginStop,
   "XHR_Abort": _XHR_Abort,
   "XHR_Create": _XHR_Create,
   "XHR_Release": _XHR_Release,
@@ -17596,7 +17494,6 @@ var asmLibraryArg = {
   "isPermissionGranted": _isPermissionGranted,
   "isRecording": _isRecording,
   "llvm_eh_typeid_for": _llvm_eh_typeid_for,
-  "reloadPage": _reloadPage,
   "setLeapSync": _setLeapSync,
   "setTempRet0": _setTempRet0,
   "start": _start,
