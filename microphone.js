@@ -133,6 +133,11 @@ class Microphone {
         this.mediaStreamSource.mediaStream.getTracks().forEach(e => e.stop());
         this.leapSync && this.mediaStreamSource.disconnect(this.audioContext.destination);
         this.mediaStreamSource.disconnect(this.audioWorkletNode);
+        
+        // 참조 명시적 해제
+        this.mediaStreamSource = null;
+        this.audioWorkletNode = null;
+
         // setInterval 타이머 중지
         if (this._checkIntervalId !== null) {
             Microphone.log("clearInterval with ID: " + this._checkIntervalId); // 로그 추가
