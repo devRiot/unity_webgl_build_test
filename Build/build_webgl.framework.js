@@ -2094,13 +2094,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5579328: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5579389: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5579453: function() {return Module.webglContextAttributes.powerPreference;},  
- 5579511: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5579566: function($0) {performance.now = function() { return $0; };},  
- 5579614: function($0) {performance.now = function() { return $0; };},  
- 5579662: function() {performance.now = Module['emscripten_get_now_backup'];}
+  5579056: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5579117: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5579181: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5579239: function() {Module['emscripten_get_now_backup'] = performance.now;},  
+ 5579294: function($0) {performance.now = function() { return $0; };},  
+ 5579342: function($0) {performance.now = function() { return $0; };},  
+ 5579390: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -2314,60 +2314,6 @@ var ASM_CONSTS = {
           .catch(function(error) {
               console.error('마이크 목록 가져오기 실패:', error);
               SendMessage(gameObject, callback, JSON.stringify([]));
-          });
-      }
-
-  function _GetCurrentMicrophone(gameObjectName, callbackMethod) {
-          var gameObject = UTF8ToString(gameObjectName);
-          var callback = UTF8ToString(callbackMethod);
-  
-          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-              SendMessage(gameObject, callback, ""); // Send empty string on failure
-              return;
-          }
-  
-          // We need to get the stream to identify the active deviceId
-          navigator.mediaDevices.getUserMedia({ audio: true })
-          .then(function(stream) {
-              const audioTracks = stream.getAudioTracks();
-              if (audioTracks.length === 0) {
-                  stream.getTracks().forEach(track => track.stop());
-                  SendMessage(gameObject, callback, "");
-                  return;
-              }
-  
-              const activeTrack = audioTracks[0];
-              const settings = activeTrack.getSettings();
-              const activeDeviceId = settings.deviceId;
-              
-              // Important: stop the track immediately to turn off the browser's mic-in-use indicator
-              stream.getTracks().forEach(track => track.stop());
-  
-              // Now that we have the active device ID, enumerate devices to find its label
-              navigator.mediaDevices.enumerateDevices()
-              .then(function(devices) {
-                  var activeDevice = devices.find(device => device.deviceId === activeDeviceId);
-                  
-                  if (activeDevice) {
-                      SendMessage(gameObject, callback, activeDevice.label);
-                  } else {
-                      // Fallback: if for some reason the active deviceId is not in the list,
-                      // or if deviceId is empty (can happen in some privacy settings),
-                      // we try to find the 'default' device or just the first audio input.
-                      var audioDevices = devices.filter(d => d.kind === 'audioinput');
-                      if (audioDevices.length > 0) {
-                          var defaultDevice = audioDevices.find(d => d.deviceId === 'default') || audioDevices[0];
-                          SendMessage(gameObject, callback, defaultDevice.label || "Default Microphone");
-                      } else {
-                          SendMessage(gameObject, callback, ""); // No audio input found
-                      }
-                  }
-              });
-          })
-          .catch(function(error) {
-              console.error('Error getting current microphone:', error);
-              // If the user denies permission here, we can't get the device.
-              SendMessage(gameObject, callback, "");
           });
       }
 
@@ -16522,6 +16468,12 @@ var ASM_CONSTS = {
           
       }
 
+  function _setLeapSync(enabled) {
+          if(document.microphoneNative === undefined)
+              return;
+          document.microphoneNative.microphone.setLeapSync(enabled === 1);
+      }
+
   function _setTempRet0(val) {
       setTempRet0(val);
     }
@@ -17087,7 +17039,6 @@ var asmLibraryArg = {
   "CheckMicrophonePermission": _CheckMicrophonePermission,
   "DownloadFile": _DownloadFile,
   "GetAvailableMicrophones": _GetAvailableMicrophones,
-  "GetCurrentMicrophone": _GetCurrentMicrophone,
   "GetJSMemoryInfo": _GetJSMemoryInfo,
   "IsMicrophoneSupported": _IsMicrophoneSupported,
   "JS_Accelerometer_IsRunning": _JS_Accelerometer_IsRunning,
@@ -17637,6 +17588,7 @@ var asmLibraryArg = {
   "isRecording": _isRecording,
   "llvm_eh_typeid_for": _llvm_eh_typeid_for,
   "reloadPage": _reloadPage,
+  "setLeapSync": _setLeapSync,
   "setTempRet0": _setTempRet0,
   "start": _start,
   "strftime": _strftime
@@ -17909,16 +17861,13 @@ var dynCall_viiiifii = Module["dynCall_viiiifii"] = createExportWrapper("dynCall
 var dynCall_viiffi = Module["dynCall_viiffi"] = createExportWrapper("dynCall_viiffi");
 
 /** @type {function(...*):?} */
-var dynCall_jijjjji = Module["dynCall_jijjjji"] = createExportWrapper("dynCall_jijjjji");
-
-/** @type {function(...*):?} */
 var dynCall_jidi = Module["dynCall_jidi"] = createExportWrapper("dynCall_jidi");
 
 /** @type {function(...*):?} */
-var dynCall_viijiiii = Module["dynCall_viijiiii"] = createExportWrapper("dynCall_viijiiii");
+var dynCall_ijji = Module["dynCall_ijji"] = createExportWrapper("dynCall_ijji");
 
 /** @type {function(...*):?} */
-var dynCall_ijji = Module["dynCall_ijji"] = createExportWrapper("dynCall_ijji");
+var dynCall_viijiiii = Module["dynCall_viijiiii"] = createExportWrapper("dynCall_viijiiii");
 
 /** @type {function(...*):?} */
 var dynCall_dii = Module["dynCall_dii"] = createExportWrapper("dynCall_dii");
@@ -17928,6 +17877,9 @@ var dynCall_jji = Module["dynCall_jji"] = createExportWrapper("dynCall_jji");
 
 /** @type {function(...*):?} */
 var dynCall_viijii = Module["dynCall_viijii"] = createExportWrapper("dynCall_viijii");
+
+/** @type {function(...*):?} */
+var dynCall_jijjjji = Module["dynCall_jijjjji"] = createExportWrapper("dynCall_jijjjji");
 
 /** @type {function(...*):?} */
 var dynCall_viijjii = Module["dynCall_viijjii"] = createExportWrapper("dynCall_viijjii");
