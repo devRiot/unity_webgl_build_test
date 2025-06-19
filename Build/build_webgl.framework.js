@@ -2094,13 +2094,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5579072: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5579133: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5579197: function() {return Module.webglContextAttributes.powerPreference;},  
- 5579255: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5579310: function($0) {performance.now = function() { return $0; };},  
+  5579120: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5579181: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5579245: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5579303: function() {Module['emscripten_get_now_backup'] = performance.now;},  
  5579358: function($0) {performance.now = function() { return $0; };},  
- 5579406: function() {performance.now = Module['emscripten_get_now_backup'];}
+ 5579406: function($0) {performance.now = function() { return $0; };},  
+ 5579454: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -16468,12 +16468,6 @@ var ASM_CONSTS = {
           
       }
 
-  function _setLeapSync(enabled) {
-          if(document.microphoneNative === undefined)
-              return;
-          document.microphoneNative.microphone.setLeapSync(enabled === 1);
-      }
-
   function _setTempRet0(val) {
       setTempRet0(val);
     }
@@ -17588,7 +17582,6 @@ var asmLibraryArg = {
   "isRecording": _isRecording,
   "llvm_eh_typeid_for": _llvm_eh_typeid_for,
   "reloadPage": _reloadPage,
-  "setLeapSync": _setLeapSync,
   "setTempRet0": _setTempRet0,
   "start": _start,
   "strftime": _strftime
