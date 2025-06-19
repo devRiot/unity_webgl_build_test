@@ -2094,13 +2094,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5579056: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5579117: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5579181: function() {return Module.webglContextAttributes.powerPreference;},  
- 5579239: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5579294: function($0) {performance.now = function() { return $0; };},  
- 5579342: function($0) {performance.now = function() { return $0; };},  
- 5579390: function() {performance.now = Module['emscripten_get_now_backup'];}
+  5579648: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5579709: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5579773: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5579831: function() {Module['emscripten_get_now_backup'] = performance.now;},  
+ 5579886: function($0) {performance.now = function() { return $0; };},  
+ 5579934: function($0) {performance.now = function() { return $0; };},  
+ 5579982: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -5685,6 +5685,14 @@ var ASM_CONSTS = {
               SendMessage(gameObject, callback, JSON.stringify(response));
           });
       }
+
+  function _ResumeAudioContext() {
+      if (typeof AudioContext !== 'undefined' && AudioContext.current && AudioContext.current.state === 'suspended') {
+        AudioContext.current.resume();
+      } else if (typeof webkitAudioContext !== 'undefined' && webkitAudioContext.current && webkitAudioContext.current.state === 'suspended') {
+        webkitAudioContext.current.resume();
+      }
+    }
 
   function _WebGLSpeechDetectionPluginInit(callback) {
           console.log("WebGLSpeechDetectionPlugin: Init");
@@ -17161,6 +17169,7 @@ var asmLibraryArg = {
   "JS_WebRequest_SetTimeout": _JS_WebRequest_SetTimeout,
   "JsSetTimeout": _JsSetTimeout,
   "RequestMicrophonePermission": _RequestMicrophonePermission,
+  "ResumeAudioContext": _ResumeAudioContext,
   "WebGLSpeechDetectionPluginInit": _WebGLSpeechDetectionPluginInit,
   "WebGLSpeechDetectionPluginIsAvailable": _WebGLSpeechDetectionPluginIsAvailable,
   "WebGLSpeechDetectionPluginStart": _WebGLSpeechDetectionPluginStart,
