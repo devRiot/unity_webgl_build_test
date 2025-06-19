@@ -2094,13 +2094,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5579616: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5579677: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5579741: function() {return Module.webglContextAttributes.powerPreference;},  
- 5579799: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5579854: function($0) {performance.now = function() { return $0; };},  
- 5579902: function($0) {performance.now = function() { return $0; };},  
- 5579950: function() {performance.now = Module['emscripten_get_now_backup'];}
+  5578080: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5578141: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5578205: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5578263: function() {Module['emscripten_get_now_backup'] = performance.now;},  
+ 5578318: function($0) {performance.now = function() { return $0; };},  
+ 5578366: function($0) {performance.now = function() { return $0; };},  
+ 5578414: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -2249,19 +2249,12 @@ var ASM_CONSTS = {
     }
 
   function _CheckMicrophonePermission() {
-          // 브라우저가 Permissions API를 지원하는 경우
           if (navigator.permissions && navigator.permissions.query) {
-              // 비동기적으로 확인하지만 동기 반환을 위해 저장된 상태 사용
               navigator.permissions.query({name: 'microphone'}).then(function(result) {
-                  // 권한 상태를 전역 변수에 저장
                   window.microphonePermissionState = result.state;
               });
-              
-              // 저장된 상태가 있으면 반환, 없으면 false
               return window.microphonePermissionState === 'granted';
           }
-          
-          // Permissions API를 지원하지 않는 경우, false를 반환
           return false;
       }
 
@@ -2300,15 +2293,12 @@ var ASM_CONSTS = {
           navigator.mediaDevices.enumerateDevices()
           .then(function(devices) {
               var microphones = [];
-              
               devices.forEach(function(device) {
                   if (device.kind === 'audioinput') {
-                      // 마이크 이름이 없는 경우 기본 이름 사용
                       var label = device.label || ('마이크 ' + (microphones.length + 1));
                       microphones.push(label);
                   }
               });
-              
               SendMessage(gameObject, callback, JSON.stringify(microphones));
           })
           .catch(function(error) {
@@ -5589,31 +5579,26 @@ var ASM_CONSTS = {
           var gameObject = UTF8ToString(gameObjectName);
           var callback = UTF8ToString(callbackMethod);
           
-          // 브라우저가 getUserMedia를 지원하는지 확인
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
               var response = {
                   success: false,
                   message: "브라우저가 마이크 접근을 지원하지 않습니다.",
                   error: "MediaDevices API not supported"
               };
-              
               SendMessage(gameObject, callback, JSON.stringify(response));
               return;
           }
   
-          // HTTPS 연결 확인 (로컬호스트 제외)
           if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
               var response = {
                   success: false,
                   message: "마이크 접근은 HTTPS 연결에서만 가능합니다.",
                   error: "HTTPS required"
               };
-              
               SendMessage(gameObject, callback, JSON.stringify(response));
               return;
           }
   
-          // 마이크 권한 요청
           navigator.mediaDevices.getUserMedia({ 
               audio: {
                   echoCancellation: false,
@@ -5622,7 +5607,6 @@ var ASM_CONSTS = {
               }
           })
           .then(function(stream) {
-              // 권한이 허용되면 스트림을 즉시 정지
               stream.getTracks().forEach(function(track) {
                   track.stop();
               });
@@ -5632,7 +5616,6 @@ var ASM_CONSTS = {
                   message: "마이크 권한이 허용되었습니다.",
                   error: ""
               };
-              
               SendMessage(gameObject, callback, JSON.stringify(response));
           })
           .catch(function(error) {
@@ -5671,58 +5654,76 @@ var ASM_CONSTS = {
                   message: errorMessage,
                   error: errorType
               };
-              
               SendMessage(gameObject, callback, JSON.stringify(response));
           });
       }
 
-  function _StartMicrophoneRecording(gameObjectName, callbackMethod) {
+  function _StartMicrophoneRecording(gameObjectName, audioChunkCallbackMethod, voiceLevelCallbackMethod) {
           var gameObject = UTF8ToString(gameObjectName);
-          var callback = UTF8ToString(callbackMethod);
+          var audioCallback = UTF8ToString(audioChunkCallbackMethod);
+          var voiceCallback = UTF8ToString(voiceLevelCallbackMethod);
   
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-              SendMessage(gameObject, callback, "Error: MediaDevices API not supported.");
+              SendMessage(gameObject, "OnError", "Error: MediaDevices API not supported.");
               return;
           }
   
           navigator.mediaDevices.getUserMedia({ audio: true })
           .then(function(stream) {
               _audioStream = stream;
-              _mediaRecorder = new MediaRecorder(stream);
-              _audioChunks = [];
+              _audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              _microphoneSource = _audioContext.createMediaStreamSource(stream);
+              _scriptProcessor = _audioContext.createScriptProcessor(4096, 1, 1);
   
-              _mediaRecorder.ondataavailable = function(event) {
-                  _audioChunks.push(event.data);
+              _scriptProcessor.onaudioprocess = function(event) {
+                  var inputBuffer = event.inputBuffer.getChannelData(0);
+                  
+                  // 음성 레벨 계산 (RMS)
+                  var sum = 0;
+                  for (var i = 0; i < inputBuffer.length; i++) {
+                      sum += inputBuffer[i] * inputBuffer[i];
+                  }
+                  var rms = Math.sqrt(sum / inputBuffer.length);
+                  SendMessage(gameObject, voiceCallback, rms.toString());
+  
+                  // 오디오 청크를 Base64로 인코딩하여 전송
+                  var buffer = new ArrayBuffer(inputBuffer.length * 4);
+                  var view = new DataView(buffer);
+                  for (var i = 0; i < inputBuffer.length; i++) {
+                      view.setFloat32(i * 4, inputBuffer[i], true);
+                  }
+                  var base64String = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+                  SendMessage(gameObject, audioCallback, base64String);
               };
   
-              _mediaRecorder.onstop = function() {
-                  var audioBlob = new Blob(_audioChunks, { type: 'audio/webm' });
-                  var audioUrl = URL.createObjectURL(audioBlob);
-                  // Unity로 녹음 완료 메시지와 함께 Blob URL 전달
-                  SendMessage(gameObject, callback, "RecordingStopped:" + audioUrl);
-              };
+              _microphoneSource.connect(_scriptProcessor);
+              _scriptProcessor.connect(_audioContext.destination);
   
-              _mediaRecorder.start();
-              SendMessage(gameObject, callback, "RecordingStarted");
               console.log("마이크 녹음 시작됨.");
           })
           .catch(function(err) {
-              SendMessage(gameObject, callback, "Error: " + err.message);
+              SendMessage(gameObject, "OnError", "Error: " + err.message);
               console.error("마이크 녹음 시작 실패:", err);
           });
       }
 
   function _StopMicrophoneRecording() {
-          if (_mediaRecorder && _mediaRecorder.state !== 'inactive') {
-              _mediaRecorder.stop();
-              // 스트림 트랙 중지
-              if (_audioStream) {
-                  _audioStream.getTracks().forEach(track => track.stop());
-              }
-              console.log("마이크 녹음 종료됨.");
-          } else {
-              console.log("녹음 중이 아님.");
+          if (_audioStream) {
+              _audioStream.getTracks().forEach(track => track.stop());
           }
+          if (_scriptProcessor) {
+              _scriptProcessor.disconnect();
+              _scriptProcessor = null;
+          }
+          if (_microphoneSource) {
+              _microphoneSource.disconnect();
+              _microphoneSource = null;
+          }
+          if (_audioContext) {
+              _audioContext.close();
+              _audioContext = null;
+          }
+          console.log("마이크 녹음 종료됨.");
       }
 
   var _best_http_request_bridge_global = {requestInstances:{},nextRequestId:1,loglevel:2,SendTextToCSharpSide:function(request, onbuffer, text)
@@ -17818,13 +17819,16 @@ var dynCall_viiiifii = Module["dynCall_viiiifii"] = createExportWrapper("dynCall
 var dynCall_viiffi = Module["dynCall_viiffi"] = createExportWrapper("dynCall_viiffi");
 
 /** @type {function(...*):?} */
+var dynCall_jijjjji = Module["dynCall_jijjjji"] = createExportWrapper("dynCall_jijjjji");
+
+/** @type {function(...*):?} */
 var dynCall_jidi = Module["dynCall_jidi"] = createExportWrapper("dynCall_jidi");
 
 /** @type {function(...*):?} */
-var dynCall_ijji = Module["dynCall_ijji"] = createExportWrapper("dynCall_ijji");
+var dynCall_viijiiii = Module["dynCall_viijiiii"] = createExportWrapper("dynCall_viijiiii");
 
 /** @type {function(...*):?} */
-var dynCall_viijiiii = Module["dynCall_viijiiii"] = createExportWrapper("dynCall_viijiiii");
+var dynCall_ijji = Module["dynCall_ijji"] = createExportWrapper("dynCall_ijji");
 
 /** @type {function(...*):?} */
 var dynCall_dii = Module["dynCall_dii"] = createExportWrapper("dynCall_dii");
@@ -17836,25 +17840,22 @@ var dynCall_jji = Module["dynCall_jji"] = createExportWrapper("dynCall_jji");
 var dynCall_viijii = Module["dynCall_viijii"] = createExportWrapper("dynCall_viijii");
 
 /** @type {function(...*):?} */
-var dynCall_jijjjji = Module["dynCall_jijjjji"] = createExportWrapper("dynCall_jijjjji");
-
-/** @type {function(...*):?} */
 var dynCall_viijjii = Module["dynCall_viijjii"] = createExportWrapper("dynCall_viijjii");
 
 /** @type {function(...*):?} */
 var dynCall_jiiii = Module["dynCall_jiiii"] = createExportWrapper("dynCall_jiiii");
 
 /** @type {function(...*):?} */
-var dynCall_jdi = Module["dynCall_jdi"] = createExportWrapper("dynCall_jdi");
-
-/** @type {function(...*):?} */
-var dynCall_jiii = Module["dynCall_jiii"] = createExportWrapper("dynCall_jiii");
+var dynCall_iiiiiifi = Module["dynCall_iiiiiifi"] = createExportWrapper("dynCall_iiiiiifi");
 
 /** @type {function(...*):?} */
 var dynCall_fi = Module["dynCall_fi"] = createExportWrapper("dynCall_fi");
 
 /** @type {function(...*):?} */
-var dynCall_iiiiiifi = Module["dynCall_iiiiiifi"] = createExportWrapper("dynCall_iiiiiifi");
+var dynCall_jdi = Module["dynCall_jdi"] = createExportWrapper("dynCall_jdi");
+
+/** @type {function(...*):?} */
+var dynCall_jiii = Module["dynCall_jiii"] = createExportWrapper("dynCall_jiii");
 
 /** @type {function(...*):?} */
 var dynCall_iiifi = Module["dynCall_iiifi"] = createExportWrapper("dynCall_iiifi");
@@ -17866,13 +17867,40 @@ var dynCall_iiiifi = Module["dynCall_iiiifi"] = createExportWrapper("dynCall_iii
 var dynCall_viiiifi = Module["dynCall_viiiifi"] = createExportWrapper("dynCall_viiiifi");
 
 /** @type {function(...*):?} */
+var dynCall_viiiji = Module["dynCall_viiiji"] = createExportWrapper("dynCall_viiiji");
+
+/** @type {function(...*):?} */
+var dynCall_vijii = Module["dynCall_vijii"] = createExportWrapper("dynCall_vijii");
+
+/** @type {function(...*):?} */
+var dynCall_ifi = Module["dynCall_ifi"] = createExportWrapper("dynCall_ifi");
+
+/** @type {function(...*):?} */
+var dynCall_idi = Module["dynCall_idi"] = createExportWrapper("dynCall_idi");
+
+/** @type {function(...*):?} */
+var dynCall_iiiiji = Module["dynCall_iiiiji"] = createExportWrapper("dynCall_iiiiji");
+
+/** @type {function(...*):?} */
+var dynCall_ijiii = Module["dynCall_ijiii"] = createExportWrapper("dynCall_ijiii");
+
+/** @type {function(...*):?} */
+var dynCall_vifii = Module["dynCall_vifii"] = createExportWrapper("dynCall_vifii");
+
+/** @type {function(...*):?} */
+var dynCall_fiii = Module["dynCall_fiii"] = createExportWrapper("dynCall_fiii");
+
+/** @type {function(...*):?} */
+var dynCall_fffi = Module["dynCall_fffi"] = createExportWrapper("dynCall_fffi");
+
+/** @type {function(...*):?} */
+var dynCall_viifii = Module["dynCall_viifii"] = createExportWrapper("dynCall_viifii");
+
+/** @type {function(...*):?} */
 var dynCall_fiifi = Module["dynCall_fiifi"] = createExportWrapper("dynCall_fiifi");
 
 /** @type {function(...*):?} */
 var dynCall_fiiii = Module["dynCall_fiiii"] = createExportWrapper("dynCall_fiiii");
-
-/** @type {function(...*):?} */
-var dynCall_viifii = Module["dynCall_viifii"] = createExportWrapper("dynCall_viifii");
 
 /** @type {function(...*):?} */
 var dynCall_viifffffi = Module["dynCall_viifffffi"] = createExportWrapper("dynCall_viifffffi");
@@ -17899,37 +17927,10 @@ var dynCall_iiiiiffi = Module["dynCall_iiiiiffi"] = createExportWrapper("dynCall
 var dynCall_viifffiiii = Module["dynCall_viifffiiii"] = createExportWrapper("dynCall_viifffiiii");
 
 /** @type {function(...*):?} */
-var dynCall_vifii = Module["dynCall_vifii"] = createExportWrapper("dynCall_vifii");
-
-/** @type {function(...*):?} */
-var dynCall_viiifffii = Module["dynCall_viiifffii"] = createExportWrapper("dynCall_viiifffii");
-
-/** @type {function(...*):?} */
 var dynCall_viiifi = Module["dynCall_viiifi"] = createExportWrapper("dynCall_viiifi");
 
 /** @type {function(...*):?} */
-var dynCall_viiiji = Module["dynCall_viiiji"] = createExportWrapper("dynCall_viiiji");
-
-/** @type {function(...*):?} */
-var dynCall_vijii = Module["dynCall_vijii"] = createExportWrapper("dynCall_vijii");
-
-/** @type {function(...*):?} */
-var dynCall_ifi = Module["dynCall_ifi"] = createExportWrapper("dynCall_ifi");
-
-/** @type {function(...*):?} */
-var dynCall_idi = Module["dynCall_idi"] = createExportWrapper("dynCall_idi");
-
-/** @type {function(...*):?} */
-var dynCall_iiiiji = Module["dynCall_iiiiji"] = createExportWrapper("dynCall_iiiiji");
-
-/** @type {function(...*):?} */
-var dynCall_ijiii = Module["dynCall_ijiii"] = createExportWrapper("dynCall_ijiii");
-
-/** @type {function(...*):?} */
-var dynCall_fiii = Module["dynCall_fiii"] = createExportWrapper("dynCall_fiii");
-
-/** @type {function(...*):?} */
-var dynCall_fffi = Module["dynCall_fffi"] = createExportWrapper("dynCall_fffi");
+var dynCall_viiifffii = Module["dynCall_viiifffii"] = createExportWrapper("dynCall_viiifffii");
 
 /** @type {function(...*):?} */
 var dynCall_iiiiiiiiii = Module["dynCall_iiiiiiiiii"] = createExportWrapper("dynCall_iiiiiiiiii");
@@ -19459,6 +19460,17 @@ function invoke_viifi(index,a1,a2,a3,a4) {
   }
 }
 
+function invoke_iiifii(index,a1,a2,a3,a4,a5) {
+  var sp = stackSave();
+  try {
+    return dynCall_iiifii(index,a1,a2,a3,a4,a5);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
 function invoke_viiiiiifiifiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14) {
   var sp = stackSave();
   try {
@@ -19474,17 +19486,6 @@ function invoke_viiffi(index,a1,a2,a3,a4,a5) {
   var sp = stackSave();
   try {
     dynCall_viiffi(index,a1,a2,a3,a4,a5);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_iiifii(index,a1,a2,a3,a4,a5) {
-  var sp = stackSave();
-  try {
-    return dynCall_iiifii(index,a1,a2,a3,a4,a5);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -19514,10 +19515,10 @@ function invoke_viiiiiii(index,a1,a2,a3,a4,a5,a6,a7) {
   }
 }
 
-function invoke_fi(index,a1) {
+function invoke_iiiiiifi(index,a1,a2,a3,a4,a5,a6,a7) {
   var sp = stackSave();
   try {
-    return dynCall_fi(index,a1);
+    return dynCall_iiiiiifi(index,a1,a2,a3,a4,a5,a6,a7);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -19525,10 +19526,10 @@ function invoke_fi(index,a1) {
   }
 }
 
-function invoke_iiiiiifi(index,a1,a2,a3,a4,a5,a6,a7) {
+function invoke_fi(index,a1) {
   var sp = stackSave();
   try {
-    return dynCall_iiiiiifi(index,a1,a2,a3,a4,a5,a6,a7);
+    return dynCall_fi(index,a1);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -19569,6 +19570,83 @@ function invoke_viiiifi(index,a1,a2,a3,a4,a5,a6) {
   }
 }
 
+function invoke_ifi(index,a1,a2) {
+  var sp = stackSave();
+  try {
+    return dynCall_ifi(index,a1,a2);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_idi(index,a1,a2) {
+  var sp = stackSave();
+  try {
+    return dynCall_idi(index,a1,a2);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9) {
+  var sp = stackSave();
+  try {
+    dynCall_viiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viiiiiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12) {
+  var sp = stackSave();
+  try {
+    dynCall_viiiiiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_vifii(index,a1,a2,a3,a4) {
+  var sp = stackSave();
+  try {
+    dynCall_vifii(index,a1,a2,a3,a4);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_fffi(index,a1,a2,a3) {
+  var sp = stackSave();
+  try {
+    return dynCall_fffi(index,a1,a2,a3);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viifii(index,a1,a2,a3,a4,a5) {
+  var sp = stackSave();
+  try {
+    dynCall_viifii(index,a1,a2,a3,a4,a5);
+  } catch(e) {
+    stackRestore(sp);
+    if (e !== e+0) throw e;
+    _setThrew(1, 0);
+  }
+}
+
 function invoke_fiifi(index,a1,a2,a3,a4) {
   var sp = stackSave();
   try {
@@ -19584,17 +19662,6 @@ function invoke_fiiii(index,a1,a2,a3,a4) {
   var sp = stackSave();
   try {
     return dynCall_fiiii(index,a1,a2,a3,a4);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_viifii(index,a1,a2,a3,a4,a5) {
-  var sp = stackSave();
-  try {
-    dynCall_viifii(index,a1,a2,a3,a4,a5);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -19690,17 +19757,6 @@ function invoke_viifffiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9) {
   }
 }
 
-function invoke_vifii(index,a1,a2,a3,a4) {
-  var sp = stackSave();
-  try {
-    dynCall_vifii(index,a1,a2,a3,a4);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
 function invoke_viiifi(index,a1,a2,a3,a4,a5) {
   var sp = stackSave();
   try {
@@ -19716,61 +19772,6 @@ function invoke_viiiifii(index,a1,a2,a3,a4,a5,a6,a7) {
   var sp = stackSave();
   try {
     dynCall_viiiifii(index,a1,a2,a3,a4,a5,a6,a7);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_ifi(index,a1,a2) {
-  var sp = stackSave();
-  try {
-    return dynCall_ifi(index,a1,a2);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_idi(index,a1,a2) {
-  var sp = stackSave();
-  try {
-    return dynCall_idi(index,a1,a2);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_viiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9) {
-  var sp = stackSave();
-  try {
-    dynCall_viiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_viiiiiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12) {
-  var sp = stackSave();
-  try {
-    dynCall_viiiiiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12);
-  } catch(e) {
-    stackRestore(sp);
-    if (e !== e+0) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_fffi(index,a1,a2,a3) {
-  var sp = stackSave();
-  try {
-    return dynCall_fffi(index,a1,a2,a3);
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
