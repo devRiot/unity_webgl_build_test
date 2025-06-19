@@ -20,7 +20,7 @@ class Microphone {
             AudioOutput: "audiooutput"
         };
         this.initialize(this);
-        this.check();
+        // this.check(); // 테스트를 위해 주석 처리
     }
 
     async initialize(e) {
@@ -32,7 +32,7 @@ class Microphone {
             e.nodeInputHandler(e, i)
         };
         e.initialized = true;
-        Microphone.log("initialized");
+        Microphone.log("initialized. AudioContext state: " + e.audioContext.state); // 로그 추가
     }
 
     async check() {
@@ -97,6 +97,21 @@ class Microphone {
             clearInterval(this._checkIntervalId);
             this._checkIntervalId = null;
         }
+        // AudioContext 닫기
+        if (this.audioContext) {
+            Microphone.log("Attempting to close AudioContext. Current state: " + this.audioContext.state); // 로그 추가
+            if (this.audioContext.state !== 'closed') {
+                this.audioContext.close().then(() => {
+                    Microphone.log("AudioContext closed successfully. Final state: " + this.audioContext.state); // 로그 추가
+                }).catch(e => {
+                    Microphone.log("Failed to close AudioContext: " + e);
+                });
+            } else {
+                Microphone.log("AudioContext is already closed."); // 로그 추가
+            }
+        }
+        this.audioContext = null; // 참조 해제
+        this.initialized = false; // 초기화 상태 재설정
         Microphone.log("end");
     }
 
