@@ -5601,9 +5601,9 @@ var ASM_CONSTS = {
   
           navigator.mediaDevices.getUserMedia({ 
               audio: {
-                  echoCancellation: false,
-                  noiseSuppression: false,
-                  autoGainControl: false
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true
               }
           })
           .then(function(stream) {
@@ -5674,6 +5674,8 @@ var ASM_CONSTS = {
               _audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
               _microphoneSource = _audioContext.createMediaStreamSource(stream);
               _scriptProcessor = _audioContext.createScriptProcessor(4096, 1, 1);
+  
+              console.log("AudioContext sampleRate:", _audioContext.sampleRate); // 실제 샘플레이트 확인 로그
   
               _scriptProcessor.onaudioprocess = function(event) {
                   var inputBuffer = event.inputBuffer.getChannelData(0);
