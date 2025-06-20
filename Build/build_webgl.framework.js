@@ -2094,13 +2094,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5578080: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5578141: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5578205: function() {return Module.webglContextAttributes.powerPreference;},  
- 5578263: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5578318: function($0) {performance.now = function() { return $0; };},  
- 5578366: function($0) {performance.now = function() { return $0; };},  
- 5578414: function() {performance.now = Module['emscripten_get_now_backup'];}
+  5581008: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5581069: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5581133: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5581191: function() {Module['emscripten_get_now_backup'] = performance.now;},  
+ 5581246: function($0) {performance.now = function() { return $0; };},  
+ 5581294: function($0) {performance.now = function() { return $0; };},  
+ 5581342: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -2295,6 +2295,7 @@ var ASM_CONSTS = {
               var microphones = [];
               devices.forEach(function(device) {
                   if (device.kind === 'audioinput') {
+                      // 마이크 이름이 없는 경우 기본 이름 사용
                       var label = device.label || ('마이크 ' + (microphones.length + 1));
                       microphones.push(label);
                   }
@@ -5579,6 +5580,7 @@ var ASM_CONSTS = {
           var gameObject = UTF8ToString(gameObjectName);
           var callback = UTF8ToString(callbackMethod);
           
+          // 브라우저가 getUserMedia를 지원하는지 확인
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
               var response = {
                   success: false,
@@ -5589,6 +5591,7 @@ var ASM_CONSTS = {
               return;
           }
   
+          // HTTPS 연결 확인 (로컬호스트 제외)
           if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
               var response = {
                   success: false,
@@ -5599,6 +5602,7 @@ var ASM_CONSTS = {
               return;
           }
   
+          // 마이크 권한 요청
           navigator.mediaDevices.getUserMedia({ 
               audio: {
                   echoCancellation: true,
@@ -5607,6 +5611,7 @@ var ASM_CONSTS = {
               }
           })
           .then(function(stream) {
+              // 권한이 허용되면 스트림을 즉시 정지
               stream.getTracks().forEach(function(track) {
                   track.stop();
               });
