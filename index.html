@@ -6,8 +6,29 @@
     <title>Unity WebGL Player | 브레인 오케이</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
+    <style>
+      /* --- 웹뷰 스타일 추가 --- */
+      #webview-container {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 1000; display: none;
+      }
+      #webview-iframe { width: 100%; height: 100%; border: none; }
+      #webview-close-button {
+        position: absolute; top: 10px; right: 10px; width: 40px; height: 40px;
+        font-size: 20px; cursor: pointer; background-color: rgba(0,0,0,0.5);
+        color: white; border: 1px solid white; border-radius: 50%; z-index: 1001;
+      }
+      /* --- 스타일 추가 끝 --- */
+    </style>
   </head>
   <body>
+    <!-- === 웹뷰 컨테이너 추가 === -->
+    <div id="webview-container">
+      <iframe id="webview-iframe" src=""></iframe>
+      <button id="webview-close-button">X</button>
+    </div>
+    <!-- === 웹뷰 컨테이너 끝 === -->
+
     <div id="unity-container" class="unity-desktop">
       <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
       <div id="unity-loading-bar">
@@ -24,7 +45,6 @@
       </div>
     </div>
     <script>
-
       var container = document.querySelector("#unity-container");
       var canvas = document.querySelector("#unity-canvas");
       var loadingBar = document.querySelector("#unity-loading-bar");
@@ -32,12 +52,6 @@
       var fullscreenButton = document.querySelector("#unity-fullscreen-button");
       var warningBanner = document.querySelector("#unity-warning");
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
       function unityShowBanner(msg, type) {
         function updateBannerVisibility() {
           warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
@@ -69,40 +83,19 @@
         showBanner: unityShowBanner,
       };
 
-      // By default, Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
-
-      // If you would like all file writes inside Unity Application.persistentDataPath
-      // directory to automatically persist so that the contents are remembered when
-      // the user revisits the site the next time, uncomment the following line:
-      // config.autoSyncPersistentDataPath = true;
-      // This autosyncing is currently not the default behavior to avoid regressing
-      // existing user projects that might rely on the earlier manual
-      // JS_FileSystem_Sync() behavior, but in future Unity version, this will be
-      // expected to change.
-
       if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
-
         var meta = document.createElement('meta');
         meta.name = 'viewport';
         meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
         document.getElementsByTagName('head')[0].appendChild(meta);
         container.className = "unity-mobile";
         canvas.className = "unity-mobile";
-
-        // To lower canvas resolution on mobile devices to gain some
-        // performance, uncomment the following line:
-        // config.devicePixelRatio = 1;
-
+        
+        // 모바일 렌더링 해상도 최적화
+        config.devicePixelRatio = 1;
 
       } else {
-        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-
+        // Unity 기본 데스크탑 스타일 유지
         canvas.style.width = "960px";
         canvas.style.height = "600px";
       }
@@ -114,18 +107,25 @@
       script.onload = () => {
         createUnityInstance(canvas, config, (progress) => {
           progressBarFull.style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                loadingBar.style.display = "none";
-                fullscreenButton.onclick = () => {
-                  unityInstance.SetFullscreen(1);
-                };
-              }).catch((message) => {
-                alert(message);
-              });
-            };
+        }).then((unityInstance) => {
+          // --- Unity 인스턴스 전역 저장 및 닫기 버튼 이벤트 리스너 추가 ---
+          window.unityInstance = unityInstance;
+          document.getElementById('webview-close-button').onclick = function () {
+              if (window.unityInstance) {
+                  window.unityInstance.SendMessage('WebGLWebView', 'OnClose', 'true');
+              }
+          };
+          // --- 로직 추가 끝 ---
+          loadingBar.style.display = "none";
+          fullscreenButton.onclick = () => {
+            unityInstance.SetFullscreen(1);
+          };
+        }).catch((message) => {
+          alert(message);
+        });
+      };
 
       document.body.appendChild(script);
-
     </script>
   </body>
 </html>
