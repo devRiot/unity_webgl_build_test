@@ -116,6 +116,11 @@
                   window.unityInstance.SendMessage('WebGLWebView', 'OnClose', 'true');
               }
           };
+          
+          // Unity로 현재 origin 전달
+          console.log('[IFrameTemplate] Sending origin to Unity:', window.location.origin);
+          window.unityInstance.SendMessage('WebGLWebView', 'SetHostOrigin', window.location.origin);
+
           // --- 로직 추가 끝 ---
           loadingBar.style.display = "none";
           fullscreenButton.onclick = () => {
