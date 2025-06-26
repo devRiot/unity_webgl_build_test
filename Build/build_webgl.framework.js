@@ -5718,7 +5718,6 @@ var ASM_CONSTS = {
                   var inputBuffer = event.inputBuffer.getChannelData(0);
                   
                   // 음성 레벨 계산 (RMS)
-                  /*
                   var sum = 0;
                   for (var i = 0; i < inputBuffer.length; i++) {
                       sum += inputBuffer[i] * inputBuffer[i];
@@ -5729,7 +5728,6 @@ var ASM_CONSTS = {
                   } catch (e) {
                       console.error("SendMessage failed in StartMicrophoneRecording (voice level callback):", e);
                   }
-                  */
   
                   // 오디오 청크를 Base64로 인코딩하여 전송
                   var buffer = new ArrayBuffer(inputBuffer.length * 4);
