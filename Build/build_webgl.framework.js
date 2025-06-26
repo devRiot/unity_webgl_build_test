@@ -5710,7 +5710,7 @@ var ASM_CONSTS = {
               _audioStream = stream;
               _audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
               _microphoneSource = _audioContext.createMediaStreamSource(stream);
-              _scriptProcessor = _audioContext.createScriptProcessor(4096, 1, 1);
+              _scriptProcessor = _audioContext.createScriptProcessor(2048, 1, 1);
   
               console.log("AudioContext sampleRate:", _audioContext.sampleRate); // 실제 샘플레이트 확인 로그
   
